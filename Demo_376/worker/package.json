@@ -1,0 +1,9 @@
+{
+  "name": "file-indexing-worker",
+  "type": "module",
+  "dependencies": {
+    "@elastic/elasticsearch": "^8.12.0",
+    "bullmq": "^5.0.0",
+    "pdf-parse": "^1.1.1"
+  }
+}

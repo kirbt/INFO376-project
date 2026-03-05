@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuSearch | File Content Indexer</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; --text: #1e293b; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); margin-bottom: 2rem; }
+        input[type="text"] { width: 70%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 16px; }
+        button { padding: 12px 24px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        button:hover { opacity: 0.9; }
+        .result-item { border-bottom: 1px solid #e2e8f0; padding: 20px 0; display: flex; justify-content: space-between; align-items: center; }
+        mark { background: #fef08a; padding: 2px 4px; border-radius: 4px; }
+        .snippet { color: #64748b; font-size: 0.9rem; margin-top: 8px; display: block; max-width: 600px; }
+        .download-btn { background: #10b981; text-decoration: none; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <h1>📂 DocuSearch 2026</h1>
+    
+    <div class="card">
+        <h3>Upload New Document</h3>
+        <input type="file" id="filePicker">
+        <button onclick="uploadFile()">Upload & Index</button>
+        <p id="uploadStatus" style="font-size: 0.8rem; color: #64748b;"></p>
+    </div>
+
+    <div class="card">
+        <h3>Search Contents</h3>
+        <input type="text" id="searchInput" placeholder="Search for text inside your files..." onkeyup="if(event.key==='Enter') performSearch()">
+        <button onclick="performSearch()">Search</button>
+        
+        <div id="resultsList">
+            </div>
+    </div>
+
+    <script>
+        async function uploadFile() {
+            const fileInput = document.getElementById('filePicker');
+            const status = document.getElementById('uploadStatus');
+            if (!fileInput.files[0]) return alert("Select a file");
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            status.innerText = "Uploading...";
+            const res = await fetch('/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            status.innerText = "Done! Processing in background...";
+            fileInput.value = "";
+        }
+
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value;
+            const resultsDiv = document.getElementById('resultsList');
+            if (!query) return;
+            resultsDiv.innerHTML = "Searching...";
+
+            const res = await fetch(`/search?q=${encodeURIComponent(query)}`);
+            const data = await res.json();
+
+            if (data.length === 0) {
+                resultsDiv.innerHTML = "<p>No matches found inside files.</p>";
+                return;
+            }
+
+            resultsDiv.innerHTML = data.map(item => `
+                <div class="result-item" style="flex-direction: column; align-items: flex-start;">
+                    <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                        <strong>${item.title}</strong>
+                        <a href="/download/${item.internalName}?name=${item.title}" class="button download-btn" style="padding: 8px 16px; color: white; border-radius: 4px; display: inline-block;"

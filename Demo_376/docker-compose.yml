@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  api:
+    build: ./api
+    ports:
+      - "3000:3000"
+    environment:
+      - ELASTIC_URL=http://elasticsearch:9200
+      - REDIS_HOST=redis
+    volumes:
+      - uploads_volume:/app/uploads
+    depends_on:
+      - redis
+      - elasticsearch
+
+  worker:
+    build: ./worker
+    environment:
+      - ELASTIC_URL=http://elasticsearch:9200
+      - REDIS_HOST=redis
+    volumes:
+      - uploads_volume:/app/uploads
+    depends_on:
+      - redis
+      - elasticsearch
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+
+volumes:
+  uploads_volume:
