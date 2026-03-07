@@ -39,19 +39,29 @@ function runNLP(text) {
 }
 
 const worker = new Worker('file-indexing', async (job) => {
-  const { internalName, originalName } = job.data;
+  const { internalName, originalName, mimetype } = job.data;
   const filePath = path.join('/app/uploads', internalName);
 
-  console.log(`Processing: ${originalName}`);
+  console.log(`Processing: ${originalName} (${mimetype})`);
 
   try {
     const buffer = await fs.readFile(filePath);
-    const data = await pdf(buffer);
+    let extractedText = '';
+
+    if (mimetype === 'application/pdf') {
+      const data = await pdf(buffer);
+      extractedText = data.text;
+    } else if (mimetype === 'text/plain' || originalName.endsWith('.txt')) {
+      extractedText = buffer.toString('utf-8');
+    } else {
+      console.warn(`Unsupported file type: ${mimetype}. Attempting to read as text.`);
+      extractedText = buffer.toString('utf-8');
+    }
     
     console.log(`Running NLP for: ${originalName}`);
     let nlpResults = {};
     try {
-      nlpResults = await runNLP(data.text);
+      nlpResults = await runNLP(extractedText);
     } catch (nlpErr) {
       console.error(`NLP Processing failed for ${originalName}: ${nlpErr.message}`);
     }
@@ -61,7 +71,7 @@ const worker = new Worker('file-indexing', async (job) => {
       document: {
         title: originalName,
         internalName: internalName,
-        content: data.text,
+        content: extractedText,
         nlp: nlpResults,
         timestamp: new Date()
       }

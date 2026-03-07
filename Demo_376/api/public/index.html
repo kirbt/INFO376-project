@@ -4,51 +4,122 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DocuSearch | File Content Indexer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #2563eb; --bg: #f8fafc; --text: #1e293b; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); max-width: 1000px; margin: 0 auto; padding: 0; }
+        nav { background: white; padding: 1rem 2rem; display: flex; gap: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 2rem; position: sticky; top: 0; z-index: 10; }
+        nav a { text-decoration: none; color: var(--text); font-weight: 500; cursor: pointer; }
+        nav a.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+        .container { padding: 0 20px 40px 20px; }
         .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); margin-bottom: 2rem; }
         input[type="text"] { width: 70%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 16px; }
         button { padding: 12px 24px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
         button:hover { opacity: 0.9; }
-        .result-item { border-bottom: 1px solid #e2e8f0; padding: 20px 0; display: flex; justify-content: space-between; align-items: center; }
+        .result-item { border-bottom: 1px solid #e2e8f0; padding: 20px 0; display: flex; flex-direction: column; }
         mark { background: #fef08a; padding: 2px 4px; border-radius: 4px; }
-        .snippet { color: #64748b; font-size: 0.9rem; margin-top: 8px; display: block; max-width: 600px; }
-        .download-btn { background: #10b981; text-decoration: none; font-size: 0.8rem; }
+        .snippet { color: #64748b; font-size: 0.9rem; margin-top: 8px; display: block; }
+        .download-btn { background: #10b981; text-decoration: none; font-size: 0.8rem; color: white; padding: 8px 16px; border-radius: 4px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f1f5f9; }
+
+        #stats-container { height: 500px; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-    <h1>📂 DocuSearch 2026</h1>
-    
-    <div class="card">
-        <h3>Upload New Document</h3>
-        <input type="file" id="filePicker">
-        <button onclick="uploadFile()">Upload & Index</button>
-        <p id="uploadStatus" style="font-size: 0.8rem; color: #64748b;"></p>
-    </div>
+    <nav>
+        <a id="nav-search" class="active" onclick="showSection('search')">Search</a>
+        <a id="nav-documents" onclick="showSection('documents')">All Documents</a>
+        <a id="nav-stats" onclick="showSection('stats')">Stats & Clustering</a>
+    </nav>
 
-    <div class="card">
-        <h3>Search Contents</h3>
-        <input type="text" id="searchInput" placeholder="Search for text inside your files..." onkeyup="if(event.key==='Enter') performSearch()">
-        <button onclick="performSearch()">Search</button>
+    <div class="container">
+        <h1>DocuSearch 2026</h1>
         
-        <div id="resultsList">
+        <!-- Search Section -->
+        <div id="section-search">
+            <div class="card">
+                <h3>Upload Documents</h3>
+                <input type="file" id="filePicker" multiple>
+                <button onclick="uploadFiles()">Upload & Index</button>
+                <p id="uploadStatus" style="font-size: 0.8rem; color: #64748b;"></p>
             </div>
+
+            <div class="card">
+                <h3>Search Contents</h3>
+                <input type="text" id="searchInput" placeholder="Search for text inside your files..." onkeyup="if(event.key==='Enter') performSearch()">
+                <button onclick="performSearch()">Search</button>
+                <div id="resultsList"></div>
+            </div>
+        </div>
+
+        <!-- Documents Section -->
+        <div id="section-documents" class="hidden">
+            <div class="card">
+                <h3>All Uploaded Documents</h3>
+                <table id="documentsTable">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Date Uploaded</th>
+                            <th>Summary</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="documentsBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Stats Section -->
+        <div id="section-stats" class="hidden">
+            <div class="card">
+                <h3>Document Clustering</h3>
+                <p style="color: #64748b; font-size: 0.9rem;">This graph uses TF-IDF and K-Means to group similar documents together in 2D space.</p>
+                <div id="stats-container">
+                    <canvas id="clusteringChart"></canvas>
+                </div>
+                <button onclick="loadClustering()" style="margin-top: 1rem;">Refresh Clustering</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        async function uploadFile() {
+        let clusteringChart = null;
+
+        function showSection(sectionId) {
+            // Update Nav
+            document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+            document.getElementById(`nav-${sectionId}`).classList.add('active');
+
+            // Update Views
+            document.getElementById('section-search').classList.add('hidden');
+            document.getElementById('section-documents').classList.add('hidden');
+            document.getElementById('section-stats').classList.add('hidden');
+            
+            document.getElementById(`section-${sectionId}`).classList.remove('hidden');
+
+            if (sectionId === 'documents') loadDocuments();
+            if (sectionId === 'stats') loadClustering();
+        }
+
+        async function uploadFiles() {
             const fileInput = document.getElementById('filePicker');
             const status = document.getElementById('uploadStatus');
-            if (!fileInput.files[0]) return alert("Select a file");
+            if (!fileInput.files.length) return alert("Select at least one file");
 
             const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+            for (const file of fileInput.files) {
+                formData.append('files', file);
+            }
 
-            status.innerText = "Uploading...";
+            status.innerText = `Uploading ${fileInput.files.length} file(s)...`;
             const res = await fetch('/upload', { method: 'POST', body: formData });
-            const data = await res.json();
-            status.innerText = "Done! Processing in background...";
+            const result = await res.json();
+            status.innerText = `Done! ${result.count} file(s) queued for processing.`;
             fileInput.value = "";
         }
 
@@ -67,7 +138,97 @@
             }
 
             resultsDiv.innerHTML = data.map(item => `
-                <div class="result-item" style="flex-direction: column; align-items: flex-start;">
-                    <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                <div class="result-item">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
                         <strong>${item.title}</strong>
-                        <a href="/download/${item.internalName}?name=${item.title}" class="button download-btn" style="padding: 8px 16px; color: white; border-radius: 4px; display: inline-block;"
+                        <a href="/download/${item.internalName}?name=${item.title}" class="download-btn">Download</a>
+                    </div>
+                    <span class="snippet">...${item.snippet}...</span>
+                    ${item.nlp && item.nlp.summary ? `
+                        <div style="margin-top: 10px; font-size: 0.85rem; background: #f1f5f9; padding: 10px; border-radius: 4px;">
+                            <strong>NLP Summary:</strong> ${item.nlp.summary}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        async function loadDocuments() {
+            const tbody = document.getElementById('documentsBody');
+            tbody.innerHTML = "<tr><td colspan='4'>Loading...</td></tr>";
+
+            const res = await fetch('/documents');
+            const data = await res.json();
+
+            if (data.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='4'>No documents uploaded yet.</td></tr>";
+                return;
+            }
+
+            tbody.innerHTML = data.map(doc => `
+                <tr>
+                    <td><strong>${doc.title}</strong></td>
+                    <td>${new Date(doc.timestamp).toLocaleString()}</td>
+                    <td style="font-size: 0.8rem; color: #64748b;">${doc.nlp?.summary || 'Processing...'}</td>
+                    <td><a href="/download/${doc.internalName}?name=${doc.title}" class="download-btn">Download</a></td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadClustering() {
+            const ctx = document.getElementById('clusteringChart').getContext('2d');
+            
+            if (clusteringChart) clusteringChart.destroy();
+
+            const res = await fetch('/stats/clustering');
+            const data = await res.json();
+
+            if (data.length === 0) {
+                ctx.fillText("Not enough documents to cluster yet.", 10, 50);
+                return;
+            }
+
+            // Group data by cluster
+            const clusters = {};
+            data.forEach(item => {
+                if (!clusters[item.cluster]) clusters[item.cluster] = [];
+                clusters[item.cluster].push({
+                    x: item.x,
+                    y: item.y,
+                    label: item.title
+                });
+            });
+
+            const colors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+            
+            const datasets = Object.keys(clusters).map((clusterId, idx) => ({
+                label: `Cluster ${clusterId}`,
+                data: clusters[clusterId],
+                backgroundColor: colors[idx % colors.length],
+                pointRadius: 8,
+                pointHoverRadius: 12
+            }));
+
+            clusteringChart = new Chart(ctx, {
+                type: 'scatter',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => ctx.raw.label
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
