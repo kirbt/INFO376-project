@@ -7,6 +7,27 @@ import { spawn } from 'node:child_process';
 
 const esClient = new Client({ node: process.env.ELASTIC_URL || 'http://elasticsearch:9200' });
 
+/**
+ * preprocesses extracted PDF text before NLP and indexing
+ * will remove:
+ * - footers
+ * - page numbers
+ * - bullet symbols
+ * - layout noise
+ * @param {String} text
+ * @returns cleaned text
+ */
+function cleanText(text) {
+  return text
+    .replace(/-\s*\n/g, "")
+    .replace(/[•●▪■]/g, "")
+    .replace(/\bPage\s*\d+\b/g, "")
+    .replace(/\b\d+\s*\/\s*\d+\b/g, "")
+    .replace(/\s+/g, " ");
+
+
+}
+
 function runNLP(text) {
   return new Promise((resolve, reject) => {
     const pythonProcess = spawn('python3', ['nlp.py']);
@@ -45,6 +66,7 @@ const worker = new Worker('file-indexing', async (job) => {
   console.log(`Processing: ${originalName} (${mimetype})`);
 
   try {
+    // check file
     const buffer = await fs.readFile(filePath);
     let extractedText = '';
 
@@ -57,11 +79,16 @@ const worker = new Worker('file-indexing', async (job) => {
       console.warn(`Unsupported file type: ${mimetype}. Attempting to read as text.`);
       extractedText = buffer.toString('utf-8');
     }
-    
+
+    // preprocessing
+    console.log(`Cleaning text for: ${originalName}`);
+    const cleanedText = cleanText(extractedText);
+
+    // nlp enrichment
     console.log(`Running NLP for: ${originalName}`);
     let nlpResults = {};
     try {
-      nlpResults = await runNLP(extractedText);
+      nlpResults = await runNLP(cleanedText);
     } catch (nlpErr) {
       console.error(`NLP Processing failed for ${originalName}: ${nlpErr.message}`);
     }
@@ -71,7 +98,7 @@ const worker = new Worker('file-indexing', async (job) => {
       document: {
         title: originalName,
         internalName: internalName,
-        content: extractedText,
+        content: cleanedText,
         nlp: nlpResults,
         timestamp: new Date()
       }

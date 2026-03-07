@@ -18,7 +18,7 @@ app.use(express.static('public'));
 app.post('/upload', upload.array('files'), async (req, res) => {
   if (!req.files || req.files.length === 0) return res.status(400).send('No files uploaded.');
 
-  const jobs = req.files.map(file => 
+  const jobs = req.files.map(file =>
     fileQueue.add('index-job', {
       internalName: file.filename,
       originalName: file.originalname,
@@ -39,7 +39,7 @@ app.get('/search', async (req, res) => {
     const result = await esClient.search({
       index: 'documents',
       query: {
-        match: { content: q } 
+        match: { content: q }
       },
       highlight: {
         fields: { content: {} },
