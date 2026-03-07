@@ -19,9 +19,11 @@ services:
       - REDIS_HOST=redis
     volumes:
       - uploads_volume:/app/uploads
+      - ./setup:/app/setup
     depends_on:
       - redis
       - elasticsearch
+    command: sh -c "node /app/setup/index.js && node index.js"
 
   redis:
     image: redis:7-alpine
