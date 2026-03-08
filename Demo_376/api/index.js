@@ -67,24 +67,38 @@ app.get('/search', async (req, res) => {
   const query_vector = await embedQuery(q);
 
   try {
+    // const result = await esClient.search({
+    //   index: 'documents',
+    //   size: 20,
+    //   query: {
+    //     script_score: {
+    //       query: {
+    //         match: { content: q }
+    //       },
+    //       script: {
+    //         source: "cosineSimilarity(params.query_vector, 'embedding') + _score",
+    //         params: { query_vector }
+    //       }
+    //     }
+    //   },
+    //   highlight: {
+    //     fields: { content: {} },
+    //     pre_tags: ['<mark>'],
+    //     post_tags: ['</mark>']
+    //   }
+    // });
+
     const result = await esClient.search({
       index: 'documents',
       size: 20,
-      query: {
-        script_score: {
-          query: {
-            match: { content: q }
-          },
-          script: {
-            source: "cosineSimilarity(params.query_vector, 'embedding') + _score",
-            params: { query_vector }
-          }
-        }
-      },
-      highlight: {
-        fields: { content: {} },
-        pre_tags: ['<mark>'],
-        post_tags: ['</mark>']
+      body: {
+        knn: {
+          field: 'embedding',
+          query_vector,
+          k: 20,
+          num_candidates: 100
+        },
+        _source: ['content', 'title', 'doc_id', 'chunk_index']
       }
     });
 
