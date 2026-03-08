@@ -13,6 +13,35 @@ const fileQueue = new Queue('file-indexing', {
   connection: { host: process.env.REDIS_HOST || 'localhost', port: 6379 }
 });
 
+function embedQuery(text) {
+  return new Promise((resolve, reject) => {
+    // make python instance
+    const py_instance = spawn("python3", ["embed.py"]);
+
+    let output = "";
+    let error = "";
+
+    py_instance.stdin.write(text);
+    py_instance.stdin.end();
+
+
+    py_instance.stdout.on("data", data => output += data.toString());
+    py_instance.stderr.on("data", data => error += data.toString());
+
+    py_instance.on("close", code => {
+      if (code !== 0) {
+        reject(new Error(`Python script failed with code ${code}: ${error}`));
+      } else {
+        try {
+          resolve(JSON.parse(output));
+        } catch (e) {
+          reject(new Error(`Failed to parse embedding output: ${output}`));
+        }
+      }
+    })
+  })
+}
+
 app.use(express.static('public'));
 
 app.post('/upload', upload.array('files'), async (req, res) => {
@@ -34,12 +63,23 @@ app.post('/upload', upload.array('files'), async (req, res) => {
 app.get('/search', async (req, res) => {
   const { q } = req.query;
   if (!q) return res.json([]);
+  console.log(`embedding query: ${q}`)
+  const query_vector = await embedQuery(q);
 
   try {
     const result = await esClient.search({
       index: 'documents',
+      size: 20,
       query: {
-        match: { content: q }
+        script_score: {
+          query: {
+            match: { content: q }
+          },
+          script: {
+            source: "cosineSimilarity(params.query_vector, 'embedding') + _score",
+            params: { query_vector }
+          }
+        }
       },
       highlight: {
         fields: { content: {} },
@@ -48,14 +88,39 @@ app.get('/search', async (req, res) => {
       }
     });
 
-    const hits = result.hits.hits.map(hit => ({
-      title: hit._source.title,
-      internalName: hit._source.internalName,
-      snippet: hit.highlight?.content ? hit.highlight.content[0] : "No preview available",
-      nlp: hit._source.nlp || {}
-    }));
 
-    res.json(hits);
+    // const hits = result.hits.hits.map(hit => ({
+    //   title: hit._source.title,
+    //   internalName: hit._source.internalName,
+    //   snippet: hit.highlight?.content ? hit.highlight.content[0] : "No preview available",
+    //   nlp: hit._source.nlp || {}
+    // }));
+
+    // group chunks by doc id
+    const hits = result.hits.hits;
+
+    const grouped = {};
+    for (const hit of hits) {
+      const docId = hit._source.doc_id;
+
+      if (!grouped[docId]) {
+        grouped[docId] = {
+          doc_id: docId,
+          title: hit._source.title,
+          snippet: hit.highlight?.content?.[0] || "No preview availasble",
+          chunks: []
+        };
+      }
+
+      grouped[docId].chunks.push({
+        chunk_index: hit._source.chunk_index,
+        snippet: hit.highlight?.content?.[0] || null
+      });
+    }
+
+    console.log(Object.values(grouped));
+
+    res.json(Object.values(grouped));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Search failed. Is the index created?" });
