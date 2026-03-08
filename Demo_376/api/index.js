@@ -101,6 +101,7 @@ app.get('/search', async (req, res) => {
 
     const grouped = {};
     for (const hit of hits) {
+      console.log(hit)
       const docId = hit._source.doc_id;
 
       if (!grouped[docId]) {
@@ -139,6 +140,8 @@ app.get('/documents', async (req, res) => {
       id: hit._id,
       ...hit._source
     }));
+
+
 
     res.json(docs);
   } catch (error) {
@@ -197,7 +200,9 @@ app.get('/stats/clustering', async (req, res) => {
 });
 
 app.get('/download/:id', (req, res) => {
-  const filePath = path.join(process.cwd(), 'uploads', req.params.id);
+  //const filePath = path.join(process.cwd(), 'uploads', req.params.id);
+  const filePath = path.join('/app/uploads', req.params.id);
+
   const fileName = req.query.name || 'document';
   res.download(filePath, fileName);
 });

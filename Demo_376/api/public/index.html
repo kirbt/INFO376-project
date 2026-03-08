@@ -20,7 +20,7 @@
         mark { background: #fef08a; padding: 2px 4px; border-radius: 4px; }
         .snippet { color: #64748b; font-size: 0.9rem; margin-top: 8px; display: block; }
         .download-btn { background: #10b981; text-decoration: none; font-size: 0.8rem; color: white; padding: 8px 16px; border-radius: 4px; }
-        
+
         table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
         th, td { text-align: left; padding: 12px; border-bottom: 1px solid #e2e8f0; }
         th { background: #f1f5f9; }
@@ -38,7 +38,7 @@
 
     <div class="container">
         <h1>DocuSearch 2026</h1>
-        
+
         <!-- Search Section -->
         <div id="section-search">
             <div class="card">
@@ -99,7 +99,7 @@
             document.getElementById('section-search').classList.add('hidden');
             document.getElementById('section-documents').classList.add('hidden');
             document.getElementById('section-stats').classList.add('hidden');
-            
+
             document.getElementById(`section-${sectionId}`).classList.remove('hidden');
 
             if (sectionId === 'documents') loadDocuments();
@@ -141,7 +141,7 @@
                 <div class="result-item">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <strong>${item.title}</strong>
-                        <a href="/download/${item.internalName}?name=${item.title}" class="download-btn">Download</a>
+                        <a href="/download/${item.doc_id}?name=${encodeURIComponent(item.title)}" class="download-btn">Download</a>
                     </div>
                     <span class="snippet">...${item.snippet}...</span>
                     ${item.nlp && item.nlp.summary ? `
@@ -170,14 +170,16 @@
                     <td><strong>${doc.title}</strong></td>
                     <td>${new Date(doc.timestamp).toLocaleString()}</td>
                     <td style="font-size: 0.8rem; color: #64748b;">${doc.nlp?.summary || 'Processing...'}</td>
-                    <td><a href="/download/${doc.internalName}?name=${doc.title}" class="download-btn">Download</a></td>
+                    <td>
+                        <a href="download/${doc.internalName}?name=${encodeURIComponent(doc.title)}" class="download-btn">Download</a>
+                    </td>
                 </tr>
             `).join('');
         }
 
         async function loadClustering() {
             const ctx = document.getElementById('clusteringChart').getContext('2d');
-            
+
             if (clusteringChart) clusteringChart.destroy();
 
             const res = await fetch('/stats/clustering');
@@ -200,7 +202,7 @@
             });
 
             const colors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-            
+
             const datasets = Object.keys(clusters).map((clusterId, idx) => ({
                 label: `Cluster ${clusterId}`,
                 data: clusters[clusterId],
