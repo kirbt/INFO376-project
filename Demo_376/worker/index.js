@@ -27,17 +27,19 @@ function cleanText(text) {
     .replace(/\s+/g, " ");
 }
 
-function chunkText(text, size = 400) {
-  const words = text.split(" ");
+function chunkText(text, size = 180, overlap = 30) {
+  const words = text.split(/\s+/);
   const chunks = [];
 
-  for (let i = 0; i < words.length; i += size) {
-    chunks.push(words.slice(i, i + size).join(" "));
-
+  for (let i = 0; i < words.length; i += (size - overlap)) {
+    const chunk = words.slice(i, i + size).join(" ");
+    chunks.push(chunk);
+    if (i + size >= words.length) break;
   }
 
   return chunks;
 }
+
 
 function embed(text) {
   return new Promise((resolve, reject) => {
