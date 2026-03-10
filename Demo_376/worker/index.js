@@ -8,17 +8,13 @@ import { spawn } from 'node:child_process';
 const esClient = new Client({ node: process.env.ELASTIC_URL || 'http://elasticsearch:9200' });
 
 
-/**
- * preprocesses extracted PDF text before NLP and indexing
- * will remove:
- * - footers
- * - page numbers
- * - bullet symbols
- * - layout noise
- * @param {String} text
- * @returns cleaned text
- */
+
 function cleanText(text) {
+  // remove
+  // - footers
+  // - page numbers
+  // - bullet symbols
+  // - layout noise
   return text
     .replace(/-\s*\n/g, "")
     .replace(/[•●▪■]/g, "")
@@ -26,6 +22,7 @@ function cleanText(text) {
     .replace(/\b\d+\s*\/\s*\d+\b/g, "")
     .replace(/\s+/g, " ");
 }
+
 
 function chunkText(text, size = 180, overlap = 30) {
   const words = text.split(/\s+/);
@@ -109,6 +106,7 @@ const worker = new Worker('file-indexing', async (job) => {
   console.log(`Processing: ${originalName} (${mimetype})`);
 
   try {
+
     // check file
     const buffer = await fs.readFile(filePath);
     let extractedText = '';
@@ -155,8 +153,8 @@ const worker = new Worker('file-indexing', async (job) => {
 
 
   for (let i = 0; i < chunks.length; i++) {
-    // embed chunk
 
+    // embed chunk
     console.log(`Embedding ${originalName} chunk ${i + 1}`)
     const vector = await embed(chunks[i])
 
@@ -174,7 +172,6 @@ const worker = new Worker('file-indexing', async (job) => {
       }
   });
 }
-
 
     console.log(`Success: ${originalName}`);
   } catch (err) {
