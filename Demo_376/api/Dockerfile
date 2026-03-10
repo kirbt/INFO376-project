@@ -13,6 +13,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir numpy
 RUN pip install --no-cache-dir pandas
 RUN pip install --no-cache-dir scikit-learn
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir sentence-transformers
+
+COPY embed.py /app/embed.py
 
 WORKDIR /app
 COPY package*.json ./
